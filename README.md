@@ -7,6 +7,7 @@ Combine the power of RAG with the power of fine-tuning - check out our [LLaMa2La
 
 # Updates
 - **2025-04-18** Updateed Postgres hybrid search
+- **2025-02-11** Implemented user feedback handling and storage with chat logs and history
 - **2025-02-03** Evaluation frameworks added: RAGAS, DeepEval
 - **2024-09-06** Implemented [Re2](https://arxiv.org/abs/2309.06275)
 - **2024-09-04** Added an evaluation script that uses Ragas to evaluate your RAG pipeline
