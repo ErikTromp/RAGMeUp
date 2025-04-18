@@ -6,6 +6,8 @@ RAG Me Up can run on CPU but is best run on any GPU with at least 16GB of vRAM w
 Combine the power of RAG with the power of fine-tuning - check out our [LLaMa2Lang repository](https://github.com/UnderstandLingBV/LLaMa2Lang) on fine-tuning LLMs which can then be used in RAG Me Up.
 
 # Updates
+- **2025-04-18** Updateed Postgres hybrid search
+- **2025-02-03** Evaluation frameworks added: RAGAS, DeepEval
 - **2024-09-06** Implemented [Re2](https://arxiv.org/abs/2309.06275)
 - **2024-09-04** Added an evaluation script that uses Ragas to evaluate your RAG pipeline
 - **2024-08-30** Added Ollama compatibility
@@ -17,14 +19,14 @@ Combine the power of RAG with the power of fine-tuning - check out our [LLaMa2La
 # Installation
 ## Server
 ```
-git clone https://github.com/UnderstandLingBV/RAGMeUp.git
+git clone https://github.com/FutureClubNL/RAGMeUp.git
 cd server
 pip install -r requirements.txt
 ```
 Then run the server using `python server.py` from the server subfolder.
 
 ## Scala UI
-Make sure you have JDK 17+. Download and install [SBT](https://www.scala-sbt.org/) and run `sbt run` from the `server/scala` directory or alternatively download the [compiled binary](https://github.com/UnderstandLingBV/RAGMeUp/releases/tag/scala-ui) and run `bin/ragemup(.bat)`
+Make sure you have JDK 17+. Download and install [SBT](https://www.scala-sbt.org/) and run `sbt run` from the `server/scala` directory or alternatively download the [compiled binary](https://github.com/FutureClubNL/RAGMeUp/releases/tag/scala-ui) and run `bin/ragemup(.bat)`
 
 ## Using Postgres (adviced for production)
 RAG Me Up supports Postgres as hybrid retrieval database with both pgvector and pg_search installed. To run Postgres instead of Milvus, follow these steps.
