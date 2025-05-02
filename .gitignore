@@ -164,3 +164,8 @@ ui/react-ui/backend/node_modules/
 
 server/*data.db*
 server/*.pickle
+ui/scala/.bloop/
+*.bloop*
+*.metals*
+ui/react-ui/
+*metals.sbt

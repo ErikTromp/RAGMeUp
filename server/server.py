@@ -2,9 +2,7 @@ from flask import Flask, request, jsonify, send_file
 import logging
 from dotenv import load_dotenv
 import os
-from RAGHelper_cloud import RAGHelperCloud
-from RAGHelper_local import RAGHelperLocal
-from pymilvus import Collection, connections
+from RAGHelper import RAGHelper
 from deepeval import evaluate
 from deepeval.metrics import (
     AnswerRelevancyMetric,
@@ -19,26 +17,8 @@ from deepeval.test_case import LLMTestCase
 import random
 from werkzeug.utils import secure_filename
 
-def load_bashrc():
-    """
-    Load environment variables from the user's .bashrc file.
-
-    This function looks for the .bashrc file in the user's home directory
-    and loads any environment variables defined with the 'export' command
-    into the current environment.
-    """
-    bashrc_path = os.path.expanduser("~/.bashrc")
-    if os.path.exists(bashrc_path):
-        with open(bashrc_path) as f:
-            for line in f:
-                if line.startswith("export "):
-                    key, value = line.strip().replace("export ", "").split("=", 1)
-                    value = value.strip(' "\'')
-                    os.environ[key] = value
-
 
 # Define custom metric classes
-
 class CounterfactualErrorHandling:
     """Custom metric to evaluate counterfactual error handling in LLMs."""
 
@@ -114,7 +94,6 @@ app = Flask(__name__)
 
 # Load environment variables
 load_dotenv()
-load_bashrc()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -122,13 +101,9 @@ logger = logging.getLogger(__name__)
 # Disable parallelism in tokenizers to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Instantiate the RAG Helper class based on the environment configuration
-if any(os.getenv(key) == "True" for key in ["use_openai", "use_gemini", "use_azure", "use_ollama"]):
-    logger.info("Instantiating the cloud RAG helper.")
-    raghelper = RAGHelperCloud(logger)
-else:
-    logger.info("Instantiating the local RAG helper.")
-    raghelper = RAGHelperLocal(logger)
+# Instantiate the RAG Helper class
+logger.info("Instantiating RAG helper.")
+raghelper = RAGHelper(logger)
 
 
 @app.route("/add_document", methods=['POST'])
@@ -379,18 +354,7 @@ def delete_document():
     if not os.path.exists(file_path):
         return jsonify({"error": "File not found"}), 404
 
-    # Remove from Milvus
-    connections.connect(uri=os.getenv('vector_store_uri'))
-    collection = Collection("LangChainCollection")
-    collection.load()
-    result = collection.delete(f'source == "{file_path}"')
-    collection.release()
-
-    # Remove from disk too
-    os.remove(file_path)
-
-    # Reinitialize BM25
-    raghelper.loadData()
+    # @TODO: Implement me
 
     return jsonify({"count": result.delete_count})
 

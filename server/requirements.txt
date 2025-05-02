@@ -6,7 +6,6 @@ langchain-docling==0.2.0
 langchain-experimental==0.3.4
 langchain-google-genai==2.0.8
 langchain-huggingface==0.1.2
-langchain-milvus==0.1.8
 langchain-ollama==0.2.2
 langchain-openai==0.3.0
 langchain-postgres==0.0.12
@@ -26,8 +25,6 @@ XlsxWriter==3.2.0
 python-pptx==1.0.2
 openpyxl==3.1.5
 tqdm
-milvus-lite==2.4.7
-pymilvus==2.5.3
 lxml==5.1.0
 rank_bm25
 openai==1.59.6
