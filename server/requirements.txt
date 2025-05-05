@@ -1,18 +1,7 @@
 docling==2.15.1
-langchain==0.3.14
-langchain-community==0.3.14
-langchain-core==0.3.29
-langchain-docling==0.2.0
-langchain-experimental==0.3.4
-langchain-google-genai==2.0.8
-langchain-huggingface==0.1.2
-langchain-ollama==0.2.2
-langchain-openai==0.3.0
-langchain-postgres==0.0.12
-langchain-text-splitters==0.3.5
-sentence-transformers==2.6.1
-transformers==4.43.1
-bitsandbytes==0.42.0
+sentence-transformers==4.1.0
+transformers==4.51.3
+bitsandbytes==0.45.5
 torch==2.4.0
 torchvision
 torchaudio
@@ -28,7 +17,7 @@ tqdm
 lxml==5.1.0
 rank_bm25
 openai==1.59.6
-google-ai-generativelanguage==0.6.15
+google-genai==1.13.0
 pillow==10.4.0
 ragas==0.1.15
 jq
@@ -39,3 +28,4 @@ pydantic_core==2.27.2
 psycopg2-binary==2.9.9
 deepeval
 nltk==3.9.1
+deepspeed==0.14.4

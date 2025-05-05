@@ -169,3 +169,5 @@ ui/scala/.bloop/
 *.metals*
 ui/react-ui/
 *metals.sbt
+server/flashrank/
+server/data/
