@@ -1,7 +1,6 @@
 docling==2.15.1
 sentence-transformers==4.1.0
 transformers==4.51.3
-bitsandbytes==0.45.5
 torch==2.4.0
 torchvision
 torchaudio
@@ -28,4 +27,3 @@ pydantic_core==2.27.2
 psycopg2-binary==2.9.9
 deepeval
 nltk==3.9.1
-deepspeed==0.14.4
