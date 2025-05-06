@@ -33,7 +33,7 @@ def create_title():
     json_data = request.get_json()
     question = json_data.get('question')
 
-    response = raghelper.llm.generate_response(
+    (response, _) = raghelper.llm.generate_response(
         None,
         f"Write a succinct title (few words) for a chat that has the question. {question}\n\nYou NEVER give explanations, only the title. You also stick to the language of the question.",
         []
@@ -60,16 +60,13 @@ def chat():
     docs = original_docs
 
     # Get the LLM response
-    (response, documents, fetched_new_documents, rewritten) = raghelper.handle_user_interaction(prompt, history)
+    (response, documents, fetched_new_documents, rewritten, new_history) = raghelper.handle_user_interaction(prompt, history)
     if not fetched_new_documents:
         documents = docs
-    # Add the response to the history
-    history.append({"role": "user", "content": prompt})
-    history.append({"role": "assistant", "content": response})
 
     response_dict = {
         "reply": response,
-        "history": history,
+        "history": new_history,
         "documents": documents,
         "rewritten": rewritten,
         "question": prompt,

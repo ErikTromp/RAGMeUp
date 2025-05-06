@@ -26,6 +26,7 @@ class Reranker:
         # Rename the text field back to content
         for result in rerank_results:
             result['content'] = result['text']
+            result['score'] = float(result['score'])
             del result['text']
         
         return rerank_results

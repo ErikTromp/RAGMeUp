@@ -155,4 +155,4 @@ class LLMHelper:
         if os.getenv("use_ollama") == "True":
             response = self.client.chat(thread)
         
-        return response
+        return (response, thread)

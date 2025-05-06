@@ -186,7 +186,7 @@ class PostgresHybridRetriever():
 
                 results = [{
                     "content": row[1],
-                    "metadata": {**row[2], "distance": row[6]}
+                    "metadata": {**row[2], "distance": float(row[6])}
                 } for row in results]
                 return results
         except Exception as e:

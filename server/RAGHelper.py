@@ -185,22 +185,22 @@ class RAGHelper:
         if os.getenv("rerank") == "True":
             self.logger.info("Reranking documents.")
             documents = self.reranker.rerank_documents(documents, prompt)[:int(os.getenv("rerank_k"))]
+        else:
+            documents = [{**document, "score": document['metadata']['distance']} for document in documents]
         
-        # Format the documents in a friendly manner
-        documents = self.format_documents(documents)
         return documents
 
     def handle_user_interaction(self, prompt, history):
         """
         Handle user interaction with the RAG system.
         """
-        rewritten = False
+        rewritten = None
         # Check if we need to fetch new documents
         fetch_new_documents = True
         if len(history) > 0:
             # Get the LLM response to see if we need to fetch new documents
             self.logger.info("History is not empty, checking if we need to fetch new documents.")
-            response = self.llm.generate_response(
+            (response, _) = self.llm.generate_response(
                 os.getenv("rag_fetch_new_instruction"),
                 os.getenv("rag_fetch_new_question").format(question=prompt),
                 history
@@ -218,23 +218,27 @@ class RAGHelper:
             # Check if the answer is in the documents or not
             if os.getenv("use_rewrite_loop") == "True":
                 self.logger.info("Rewrite is enabled - checking if the fetched documents contain the answer.")
-                response = self.llm.generate_response(
-                    os.getenv("rewrite_query_instruction").format(context=documents),
+                (response, _) = self.llm.generate_response(
+                    os.getenv("rewrite_query_instruction").format(context=self.format_documents(documents)),
                     os.getenv("rewrite_query_question").format(question=prompt),
                     []
                 )
                 if response.lower().strip() == "no":
                     # Rewrite the query
                     self.logger.info("Rewrite is enabled and the answer is not in the documents - rewriting the query.")
-                    new_prompt = self.llm.generate_response(
+                    (new_prompt, _) = self.llm.generate_response(
                         None,
                         os.getenv("rewrite_query_prompt").format(question=prompt),
                         []
                     )
                     self.logger.info(f"Rewrite complete, original query: {prompt}, rewritten query: {new_prompt}")
-                    rewritten = True
+                    rewritten = new_prompt
                     # Reobtain documents with new question
                     documents = self.handle_documents(new_prompt, prompt_embedding)
+                else:
+                    self.logger.info("Rewrite is enabled but the query is adequate.")
+            else:
+                self.logger.info("Rewrite is disabled - using the original query.")
         
         # Apply RE2 if turend on
         if os.getenv("use_re2") == "True":
@@ -242,23 +246,26 @@ class RAGHelper:
 
         # Get the LLM response
         if len(history) == 0:
-            response = self.llm.generate_response(
-                os.getenv("rag_instruction").format(context=documents),
+            (response, new_history) = self.llm.generate_response(
+                os.getenv("rag_instruction").format(context=self.format_documents(documents)),
                 os.getenv("rag_question_initial").format(question=prompt),
                 []
             )
         elif fetch_new_documents:
             # Add the documents to the system prompt and remove the previous system prompt
-            response = self.llm.generate_response(
-                os.getenv("rag_instruction").format(context=documents),
+            (response, new_history) = self.llm.generate_response(
+                os.getenv("rag_instruction").format(context=self.format_documents(documents)),
                 os.getenv("rag_question_followup").format(question=prompt),
                 [message for message in history if message["role"] != "system"]
             )
         else:
             # Keep the full history, with system prompt and previous documents
-            response = self.llm.generate_response(
+            (response, new_history) = self.llm.generate_response(
                 None,
                 os.getenv("rag_question_followup").format(question=prompt),
                 history
             )
-        return (response, documents, fetch_new_documents, rewritten)
+        
+        # Add the response to the history
+        new_history.append({"role": "assistant", "content": response})
+        return (response, documents, fetch_new_documents, rewritten, new_history)
