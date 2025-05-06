@@ -80,14 +80,17 @@ class LLMHelper:
         """
         Generate a response from the LLM.
         """
+        history_to_use = history.copy()
         if system_prompt is not None:
             if len(history) > 0 and history[0]["role"] != "system":
-                history = [{"role": "system", "content": system_prompt}] + history
+                history_to_use = [{"role": "system", "content": system_prompt}] + history
             elif len(history) == 0:
-                history = [{"role": "system", "content": system_prompt}]
+                history_to_use = [{"role": "system", "content": system_prompt}]
+            elif history[0]["role"] == "system":
+                history_to_use[0]["content"] = system_prompt
         
         # Make the thread
-        thread = history + [{"role": "user", "content": prompt}]
+        thread = history_to_use + [{"role": "user", "content": prompt}]
 
         # Generate the response
         if os.getenv("use_openai") == "True" or os.getenv("use_azure") == "True":
@@ -108,7 +111,7 @@ class LLMHelper:
 
             if system_prompt is not None:
                 config = types.GenerateContentConfig(
-                    system_instruction=history[0]["content"],
+                    system_instruction=history_to_use[0]["content"],
                     temperature=self.temperature,
                 )
             else:
@@ -141,7 +144,7 @@ class LLMHelper:
             if system_prompt is not None:
                 response = self.client.messages.create(
                     model=os.getenv("anthropic_model_name"),
-                    system=history[0]["content"],
+                    system=history_to_use[0]["content"],
                     temperature=self.temperature,
                     messages=anthropic_thread,
                 )
@@ -155,4 +158,8 @@ class LLMHelper:
         if os.getenv("use_ollama") == "True":
             response = self.client.chat(thread)
         
+        # Debug print the thread and response
+        self.logger.debug(f"[LLMHelper] Thread: {thread}")
+        self.logger.debug(f"[LLMHelper] Response: {response}")
+
         return (response, thread)

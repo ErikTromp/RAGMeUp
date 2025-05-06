@@ -201,11 +201,11 @@ class RAGHelper:
             # Get the LLM response to see if we need to fetch new documents
             self.logger.info("History is not empty, checking if we need to fetch new documents.")
             (response, _) = self.llm.generate_response(
-                os.getenv("rag_fetch_new_instruction"),
+                None,
                 os.getenv("rag_fetch_new_question").format(question=prompt),
                 history
             )
-            if response.lower().strip() == "no":
+            if response.lower().strip().startswith("no"):
                 fetch_new_documents = False
         
         # Fetch new documents if needed
@@ -223,12 +223,12 @@ class RAGHelper:
                     os.getenv("rewrite_query_question").format(question=prompt),
                     []
                 )
-                if response.lower().strip() == "no":
+                if response.lower().strip().startswith("no"):
                     # Rewrite the query
                     self.logger.info("Rewrite is enabled and the answer is not in the documents - rewriting the query.")
                     (new_prompt, _) = self.llm.generate_response(
                         None,
-                        os.getenv("rewrite_query_prompt").format(question=prompt),
+                        os.getenv("rewrite_query_prompt").format(question=prompt, motivation=f"Can I find the answer in the documents: {response}"),
                         []
                     )
                     self.logger.info(f"Rewrite complete, original query: {prompt}, rewritten query: {new_prompt}")
@@ -242,7 +242,7 @@ class RAGHelper:
         
         # Apply RE2 if turend on
         if os.getenv("use_re2") == "True":
-            prompt = prompt + f"{prompt}\n{os.getenv('re2_prompt')}\n{prompt}"
+            prompt = f"{prompt}\n{os.getenv('re2_prompt')}\n{prompt}"
 
         # Get the LLM response
         if len(history) == 0:

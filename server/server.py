@@ -11,9 +11,16 @@ app = Flask(__name__)
 # Load environment variables
 load_dotenv(override=True)
 
+# Set the logging level
+logging_level = os.getenv("logging_level")
+if logging_level == "DEBUG":
+    logging_level = logging.DEBUG
+else:
+    logging_level = logging.INFO
+
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.INFO,
+    level=logging_level,
     datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 
