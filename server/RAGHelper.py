@@ -59,7 +59,7 @@ class RAGHelper:
         embedding_model = os.getenv("embedding_model")
         device = (
             "cpu"
-            if os.getenv("force_cpu") == "True"
+            if os.getenv("embedding_cpu") == "True"
             else "cuda"
         )
         self.logger.info(f"Initializing embedding model {embedding_model} on device {device}.")
