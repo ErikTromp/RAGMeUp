@@ -60,9 +60,22 @@ def chat():
     docs = original_docs
 
     # Get the LLM response
-    (new_history, response) = raghelper.handle_user_interaction(prompt, history)
-    
+    (response, documents, fetched_new_documents, rewritten) = raghelper.handle_user_interaction(prompt, history)
+    if not fetched_new_documents:
+        documents = docs
+    # Add the response to the history
+    history.append({"role": "user", "content": prompt})
+    history.append({"role": "assistant", "content": response})
 
+    response_dict = {
+        "reply": response,
+        "history": history,
+        "documents": documents,
+        "rewritten": rewritten,
+        "question": prompt,
+        "fetched_new_documents": fetched_new_documents
+    }
+    return jsonify(response_dict)
 
 @app.route("/get_documents", methods=['GET'])
 def get_documents():

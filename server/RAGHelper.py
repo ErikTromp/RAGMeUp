@@ -1,7 +1,5 @@
 import hashlib
 import os
-import pickle
-import re
 import glob
 from tqdm import tqdm
 import json
@@ -16,7 +14,6 @@ from docling.document_converter import DocumentConverter
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
-from langchain_core.documents.base import Document
 
 from Reranker import Reranker
 
@@ -171,20 +168,33 @@ class RAGHelper:
         """
         doc_strings = []
         for i, doc in enumerate(docs):
-            breakpoint()
             metadata_string = ", ".join(
                 [f"{md}: {doc['metadata'][md]}" for md in doc['metadata'].keys()]
             )
             filename = doc['metadata']['source']
             doc_strings.append(
-                f"Document `{filename}` content: {doc['content']}\nDocument {filename} metadata: {metadata_string}"
+                f"[Document] *Filename* `{filename}`\n*Content*: {doc['content']}\n*Metadata* {metadata_string} [/Document]"
             )
-        return "\n\n<NEWDOC>\n\n".join(doc_strings)
-    
+        return "\n\n".join(doc_strings)
+
+    def handle_documents(self, prompt, prompt_embedding):
+        # Reobtain documents with new question
+        documents = self.retriever.get_relevant_documents(prompt, prompt_embedding)
+
+        # Check if we need to apply the reranker and run it
+        if os.getenv("rerank") == "True":
+            self.logger.info("Reranking documents.")
+            documents = self.reranker.rerank_documents(documents, prompt)[:int(os.getenv("rerank_k"))]
+        
+        # Format the documents in a friendly manner
+        documents = self.format_documents(documents)
+        return documents
+
     def handle_user_interaction(self, prompt, history):
         """
         Handle user interaction with the RAG system.
         """
+        rewritten = False
         # Check if we need to fetch new documents
         fetch_new_documents = True
         if len(history) > 0:
@@ -199,18 +209,11 @@ class RAGHelper:
                 fetch_new_documents = False
         
         # Fetch new documents if needed
+        documents = None
         if fetch_new_documents:
             self.logger.info("Fetching new documents.")
             prompt_embedding = self.embeddings.encode(prompt)
-            documents = self.retriever.get_relevant_documents(prompt, prompt_embedding)
-        
-            # Check if we need to apply the reranker and run it
-            if os.getenv("rerank") == "True":
-                self.logger.info("Reranking documents.")
-                documents = self.reranker.rerank_documents(documents, prompt)[:int(os.getenv("rerank_k"))]
-            
-            # Format the documents in a friendly manner
-            documents = self.format_documents(documents)
+            documents = self.handle_documents(prompt, prompt_embedding)
 
             # Check if the answer is in the documents or not
             if os.getenv("use_rewrite_loop") == "True":
@@ -223,13 +226,39 @@ class RAGHelper:
                 if response.lower().strip() == "no":
                     # Rewrite the query
                     self.logger.info("Rewrite is enabled and the answer is not in the documents - rewriting the query.")
-                    response = self.llm.generate_response(
+                    new_prompt = self.llm.generate_response(
                         None,
                         os.getenv("rewrite_query_prompt").format(question=prompt),
                         []
                     )
-                    self.logger.info(f"Rewrite complete, original query: {prompt}, rewritten query: {response}")
+                    self.logger.info(f"Rewrite complete, original query: {prompt}, rewritten query: {new_prompt}")
+                    rewritten = True
+                    # Reobtain documents with new question
+                    documents = self.handle_documents(new_prompt, prompt_embedding)
+        
+        # Apply RE2 if turend on
+        if os.getenv("use_re2") == "True":
+            prompt = prompt + f"{prompt}\n{os.getenv('re2_prompt')}\n{prompt}"
 
         # Get the LLM response
-        response = self.llm.generate_response(prompt, history)
-        return response
+        if len(history) == 0:
+            response = self.llm.generate_response(
+                os.getenv("rag_instruction").format(context=documents),
+                os.getenv("rag_question_initial").format(question=prompt),
+                []
+            )
+        elif fetch_new_documents:
+            # Add the documents to the system prompt and remove the previous system prompt
+            response = self.llm.generate_response(
+                os.getenv("rag_instruction").format(context=documents),
+                os.getenv("rag_question_followup").format(question=prompt),
+                [message for message in history if message["role"] != "system"]
+            )
+        else:
+            # Keep the full history, with system prompt and previous documents
+            response = self.llm.generate_response(
+                None,
+                os.getenv("rag_question_followup").format(question=prompt),
+                history
+            )
+        return (response, documents, fetch_new_documents, rewritten)
