@@ -280,7 +280,7 @@ class RAGHelper:
             elif os.getenv("provenance_method") == "llm":
                 provenance_scores = compute_llm_provenance(self.llm, prompt, documents, response)
             elif os.getenv("provenance_method") == "similarity":
-                provenance_scores = self.similarity_attribution.compute_similarity_provenance(prompt, self.format_documents(documents), response)
+                provenance_scores = self.similarity_attribution.compute_similarity(prompt, documents, response)
         
         # Add the response to the history
         new_history.append({"role": "assistant", "content": response})

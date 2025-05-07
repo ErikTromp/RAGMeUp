@@ -81,7 +81,7 @@ def chat():
     }
     if provenance_scores is not None:
         for i, doc in enumerate(response_dict["documents"]):
-            response_dict["documents"][i]["provenance"] = provenance_scores[doc["id"]]
+            response_dict["documents"][i]["provenance"] = provenance_scores[i]["score"]
     return jsonify(response_dict)
 
 @app.route("/get_documents", methods=['GET'])

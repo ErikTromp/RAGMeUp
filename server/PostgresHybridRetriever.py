@@ -142,7 +142,7 @@ class PostgresHybridRetriever():
                             LIMIT %s
                         ) bm25_results
 
-                        UNION
+                        UNION ALL
 
                         SELECT * FROM (
                             SELECT
@@ -157,15 +157,26 @@ class PostgresHybridRetriever():
                             LIMIT %s
                         ) vector_results
                     ),
+                    deduplicated AS (
+                        SELECT 
+                            id,
+                            content,
+                            metadata,
+                            MAX(score_bm25) as score_bm25,
+                            MIN(distance) as distance,
+                            string_agg(source, ',') as sources
+                        FROM combined
+                        GROUP BY id, content, metadata
+                    ),
                     scored AS (
                         SELECT *,
                             MAX(score_bm25) OVER () AS max_bm25,
                             MIN(distance) OVER () AS min_distance,
                             MAX(distance) OVER () AS max_distance
-                        FROM combined
+                        FROM deduplicated
                     )
                     SELECT
-                        id, content, metadata, score_bm25, distance, source,
+                        id, content, metadata, score_bm25, distance, sources,
                         (
                             0.5 * COALESCE(score_bm25 / NULLIF(max_bm25, 0), 0) +
                             0.5 * COALESCE(1 - (distance - min_distance) / NULLIF((max_distance - min_distance), 0), 0)
