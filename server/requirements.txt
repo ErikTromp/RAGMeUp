@@ -27,3 +27,4 @@ pydantic_core==2.27.2
 psycopg2-binary==2.9.9
 deepeval
 nltk==3.9.1
+langchain-experimental==0.3.4
