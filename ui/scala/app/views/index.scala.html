@@ -173,14 +173,14 @@
       var doclist = $('<div class="documentdiv">');
 
       for (let doc of documents) {
-          var linktext = doc['s'];
+          var linktext = doc['metadata']['source'];
           const parts = linktext.split(/[\\/]/);
           linktext = parts.pop();
           if ('provenance' in doc) {
               linktext += ' (provenance: ' + String(Math.round(doc['provenance'] * 100000) / 100000) + ')';
           }
-          var content = unicodeToChar(doc['c']).substring(0, 100);
-          if (doc['c'].length > 100) {
+          var content = unicodeToChar(doc['content']).substring(0, 100);
+          if (doc['content'].length > 100) {
               content += ' ...';
           }
 
@@ -208,7 +208,7 @@
           );
 
           // Create and configure the clickable container
-          var doccontainer = $('<p  data-content="' + unicodeToChar(doc['c']) + '" class="documentcontainerclass">').append(doclink).css('cursor', 'pointer');
+          var doccontainer = $('<p  data-content="' + unicodeToChar(doc['content']) + '" class="documentcontainerclass">').append(doclink).css('cursor', 'pointer');
 
           // Append the created doccontainer to the document list
           doclist.append(doccontainer);
@@ -289,7 +289,7 @@
                 $("#mainContainer").remove();
 
                 if (data['rewritten']) {
-                  var msg = '<span style="color: #ccc; font-style: italic; font-weight: 300;">Your message has been rewritten to this:</span>\n\n' + data['question'];
+                  var msg = '<span style="color: #ccc; font-style: italic; font-weight: 300;">Your message has been rewritten to this:</span>\n\n' + data['rewritten'];
                   addMessage(msg, true);
                 }
 

@@ -88,7 +88,7 @@ class HomeController @Inject()(
             )
             _ <- chatDAO.addChatMessage(
               ChatMessage(chat.id, messageOffset + 1, System.currentTimeMillis(), (response.json.as[JsObject] \ "reply").as[String], "assistant",
-                Json.stringify((response.json.as[JsObject] \ "documents").as[JsValue]), (response.json.as[JsObject] \ "rewritten").as[Boolean], (response.json.as[JsObject] \ "fetched_new_documents").as[Boolean])
+                Json.stringify((response.json.as[JsObject] \ "documents").as[JsValue]), (response.json.as[JsObject] \ "rewritten").asOpt[String].isDefined, (response.json.as[JsObject] \ "fetched_new_documents").as[Boolean])
             )
           } yield {
             Ok(response.json)
