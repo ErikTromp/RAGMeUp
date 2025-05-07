@@ -17,6 +17,8 @@ from langchain_experimental.text_splitter import SemanticChunker
 
 from Reranker import Reranker
 
+from provenance import compute_llm_provenance, compute_rerank_provenance, DocumentSimilarityAttribution
+
 class RAGHelper:
     """
     A helper class to manage retrieval-augmented generation (RAG) processes,
@@ -50,6 +52,10 @@ class RAGHelper:
         self.splitter = self._initialize_text_splitter()
         if not self.retriever.has_data():
             self.load_data()
+        
+        # Provenance
+        if os.getenv("provenance_method") == "similarity":
+            self.similarity_attribution = DocumentSimilarityAttribution()
 
     ############################
     ### Initialization functions
@@ -266,6 +272,16 @@ class RAGHelper:
                 history
             )
         
+        # Compute the provenance score
+        provenance_scores = None
+        if os.getenv("provenance_method") in ["rerank", "llm", "similarity"]:
+            if os.getenv("provenance_method") == "rerank":
+                provenance_scores = compute_rerank_provenance(self.reranker, prompt, documents, response)
+            elif os.getenv("provenance_method") == "llm":
+                provenance_scores = compute_llm_provenance(self.llm, prompt, documents, response)
+            elif os.getenv("provenance_method") == "similarity":
+                provenance_scores = self.similarity_attribution.compute_similarity_provenance(prompt, self.format_documents(documents), response)
+        
         # Add the response to the history
         new_history.append({"role": "assistant", "content": response})
-        return (response, documents, fetch_new_documents, rewritten, new_history)
+        return (response, documents, fetch_new_documents, rewritten, new_history, provenance_scores)

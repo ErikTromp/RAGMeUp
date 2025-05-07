@@ -67,7 +67,7 @@ def chat():
     docs = original_docs
 
     # Get the LLM response
-    (response, documents, fetched_new_documents, rewritten, new_history) = raghelper.handle_user_interaction(prompt, history)
+    (response, documents, fetched_new_documents, rewritten, new_history, provenance_scores) = raghelper.handle_user_interaction(prompt, history)
     if not fetched_new_documents:
         documents = docs
 
@@ -79,6 +79,9 @@ def chat():
         "question": prompt,
         "fetched_new_documents": fetched_new_documents
     }
+    if provenance_scores is not None:
+        for i, doc in enumerate(response_dict["documents"]):
+            response_dict["documents"][i]["provenance"] = provenance_scores[doc["id"]]
     return jsonify(response_dict)
 
 @app.route("/get_documents", methods=['GET'])
