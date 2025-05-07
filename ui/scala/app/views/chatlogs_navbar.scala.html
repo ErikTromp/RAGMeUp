@@ -1,0 +1,50 @@
+@(chats: Seq[models.Chat])
+<nav id="right-sidebar" class="bg-light sidebar sidebar-right" style="height: 100%; padding: 5px;">
+    <div class="text-end mb-2" style="padding-right: 10px;">
+        <a href="@controllers.routes.HomeController.index()" class="text-dark" style="font-size: 1.2rem;">
+            <i class="fa-solid fa-pen-to-square"></i>
+        </a>
+    </div>
+    Previous chats
+    <ul class="nav flex-column">
+        @for(chat <- chats) {
+        <li class="nav-item mb-2">
+            <a href="@controllers.routes.HomeController.loadChat(chat.id)" class="nav-link text-dark" title="@chat.title" style="font-size: 0.8rem; white-space: nowrap;">
+                <i class="delconvo fa-solid fa-trash-can" style="color: #a30808; margin-left: -5px; padding-right: 2px; z-index: 10;" data-id="@chat.id"></i>
+                @if(chat.title.size > 25) {
+                    @{chat.title.take(25) + " ..."}
+                } else {
+                    @chat.title
+                }
+            </a>
+        </li>
+        }
+    </ul>
+</nav>
+<script type="text/javascript">
+    $(document).ready(function() {
+        $(".delconvo").on('click', function (event) {
+            event.preventDefault();
+            var chatId = $(this).data('id');
+            const elem = $(this);
+
+            $.ajax({
+                type: "POST",
+                url: "@controllers.routes.HomeController.deleteChat()",
+                data: JSON.stringify({
+                  id: chatId
+                }),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function(data){
+                    $(elem).parent().parent().remove();
+                    if (window.location.toString().includes(chatId)) {
+                        window.location = '@controllers.routes.HomeController.index()';
+                    }
+                },
+                error: function(errMsg) {}
+            });
+
+        });
+    });
+</script>

@@ -1,4 +1,4 @@
-@()(content: Html)
+@()(content: Html, chatLogs: Seq[models.Chat] = Nil)
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,6 +37,9 @@
             </div>
         </div>
     </nav>
-    @content
+    <div class="row" style="height: 100%">
+        <div class="col-10">@content</div>
+        <div class="col-2" style="height: 100%">@chatlogs_navbar(chatLogs)</div>
+    </div>
 </body>
 </html>

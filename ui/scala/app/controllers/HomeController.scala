@@ -28,8 +28,10 @@ class HomeController @Inject()(
     feedbackDAO: FeedbackDAO
 ) (implicit ec: ExecutionContext) extends AbstractController(cc) {
 
-  def index() = Action { implicit request: Request[AnyContent] =>
-    Ok(views.html.index(config))
+  def index() = Action.async { implicit request: Request[AnyContent] =>
+    chatDAO.getLastN(20).map { chats =>
+      Ok(views.html.index(config, chats, None))
+    }
   }
 
   def add() = Action.async { implicit request: Request[AnyContent] =>
@@ -199,5 +201,20 @@ class HomeController @Inject()(
       (json \ "feedback").as[Boolean],
       (json \ "feedback_text").as[String]
     )).map {_ => Ok(Json.obj())}
+  }
+
+  def loadChat(chatId: String) = Action.async { implicit request: Request[AnyContent] =>
+    for {
+      chat <- chatDAO.get(chatId)
+      messages <- chatDAO.getHistory(chatId)
+      chats <- chatDAO.getLastN(20)
+    } yield Ok(views.html.index(config, chats, Some((chat.get, messages))))
+  }
+
+  def deleteChat() = Action.async { implicit request: Request[AnyContent] =>
+    val id = (request.body.asJson.get.as[JsObject] \ "id").as[String]
+    chatDAO.delete(id).map { _ =>
+      Ok(Json.obj())
+    }
   }
 }

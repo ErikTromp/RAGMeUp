@@ -1,8 +1,9 @@
 @import views.html.helper._
 @import play.api.mvc.RequestHeader
-@(config: play.api.Configuration)(implicit request: RequestHeader)
+@(config: play.api.Configuration, chatLogs: Seq[models.Chat], chatHistory: Option[(models.Chat, Seq[models.ChatMessage])] = None)(implicit request: RequestHeader)
 
 @main() {
+
 <div id="mainContainer" class="container">
   <div class="card" id="queryCard">
     <div class="card-body" style="text-align: center; width: 800px;">
@@ -305,7 +306,8 @@
             error: function(errMsg) {
                 $("#loader").hide();
                 $("#inputbar").show();
-                addMessage('Something went wrong, please try again...', false);
+                console.log(errMsg);
+                addMessage('Something went wrong, please try again... (Error: ' + errMsg + ' )', false);
             },
             timeout: 300000
         });
