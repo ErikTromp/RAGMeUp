@@ -81,22 +81,32 @@ class HomeController @Inject()(
               })
           }
         }).flatMap { chat =>
-          // Now insert the chat messages
-          val history = (response.json \ "history").as[Seq[JsObject]].drop(messageOffset - 1)
-          val (systemMessages, historyMessages) = history.partition(message => (message \ "role").as[String] == "system")
+          val newHistoryFuture = if (history.size > 0 && (response.json \ "history").as[Seq[JsObject]].size - 2 != history.size) {
+            // The history has shrunk, meaning we need to clear and re-insert everything
+            chatDAO.deleteMessages(chat.id).map{_ => (response.json \ "history").as[Seq[JsObject]]}
+          } else
+            Future.successful().map { _ =>
+              (response.json \ "history").as[Seq[JsObject]].drop(messageOffset - 1)
+            }
+          
+          newHistoryFuture.flatMap { newHistory =>
+            // Now insert the chat messages
+            val (systemMessages, historyMessages) = newHistory.partition(message => (message \ "role").as[String] == "system")
 
-          val chatMessages = (systemMessages.headOption match {
-            case Some(message) => Seq(ChatMessage(chat.id, messageOffset, askTime - 1, (message \ "content").as[String], "system", Json.stringify(Json.arr()), None, false))
-            case None => Nil
-          }) ++ historyMessages.map {message =>
-            if ((message \ "role").as[String] == "user")
-              ChatMessage(chat.id, (if (systemMessages.size > 0) 1 else 0) + messageOffset, askTime, (message \ "content").as[String], "user", Json.stringify(Json.arr()), None, false)
-            else
-              ChatMessage(chat.id, (if (systemMessages.size > 0) 1 else 0) + messageOffset + 1, System.currentTimeMillis(), (message \ "content").as[String], "assistant",
-                Json.stringify((response.json.as[JsObject] \ "documents").as[JsValue]), (response.json.as[JsObject] \ "rewritten").asOpt[String], (response.json.as[JsObject] \ "fetched_new_documents").as[Boolean])
-          }
-          Future.sequence(chatMessages.map(message => chatDAO.addChatMessage(message))).map {_ =>
-            Ok(response.json)
+            val chatMessages = (systemMessages.headOption match {
+              case Some(message) => Seq(ChatMessage(chat.id, messageOffset, askTime - 1, (message \ "content").as[String], "system", Json.stringify(Json.arr()), None, false))
+              case None => Nil
+            }) ++ historyMessages.map { message =>
+              if ((message \ "role").as[String] == "user")
+                ChatMessage(chat.id, (if (systemMessages.size > 0) 1 else 0) + messageOffset, askTime, (response.json \ "question").as[String], "user", Json.stringify(Json.arr()), None, false)
+              else
+                ChatMessage(chat.id, (if (systemMessages.size > 0) 1 else 0) + messageOffset + 1, System.currentTimeMillis(), (message \ "content").as[String], "assistant",
+                  Json.stringify((response.json.as[JsObject] \ "documents").as[JsValue]), (response.json.as[JsObject] \ "rewritten").asOpt[String], (response.json.as[JsObject] \ "fetched_new_documents").as[Boolean])
+            }
+
+            Future.sequence(chatMessages.map(message => chatDAO.addChatMessage(message))).map { _ =>
+              Ok(response.json)
+            }
           }
         }
       )
@@ -134,55 +144,53 @@ class HomeController @Inject()(
   }
 
   def upload = Action.async(parse.multipartFormData) { implicit request =>
-    request.body.file("file").map { file =>
-    // Copy over file
-    val filename = Paths.get(file.filename).getFileName
-    val dataFolder = config.get[String]("data_folder")
-    val filePath = new java.io.File(s"$dataFolder/$filename")
+    val dataset = request.body.asFormUrlEncoded("dataset").head
+    val fileUploads = Future.sequence(request.body.files.map {file =>
+      // Copy over file
+      val filename = Paths.get(file.filename).getFileName
+      val dataFolder = config.get[String]("data_folder")
+      val filePath = new java.io.File(s"$dataFolder/$filename")
 
-    // Create folder if it doesn't exist yet
-    val dataFolderFile = new File(dataFolder)
-    if (!dataFolderFile.exists()) {
-      if (dataFolderFile.mkdirs()) {} else {
-        throw new RuntimeException(s"Failed to create directory $dataFolder.")
-      }
-    } else if (!dataFolderFile.isDirectory) {
-      throw new RuntimeException(s"$dataFolder exists but is not a directory.")
-    }
-
-    file.ref.copyTo(filePath)
-
-    // Prepare the file as a FilePart
-    val filePart = FilePart(
-      key = "file",
-      filename = filePath.getName,
-      contentType = Some(Files.probeContentType(filePath.toPath)),
-      ref = FileIO.fromPath(filePath.toPath)
-    )
-
-    // Send the file as multipart/form-data
-    ws.url(s"${config.get[String]("server_url")}/add_document")
-      .withRequestTimeout(5.minutes)
-      .post(Source(List(filePart)))
-      .map { response =>
-        // Remove the file locally
-        filePath.delete()
-
-        response.status match {
-          case OK =>
-            Redirect(routes.HomeController.add()).flashing("success" -> "Added file to the database.")
-          case _ => Redirect(routes.HomeController.add()).flashing("error" -> "Adding file to database failed.")
+      // Create folder if it doesn't exist yet
+      val dataFolderFile = new File(dataFolder)
+      if (!dataFolderFile.exists()) {
+        if (dataFolderFile.mkdirs()) {} else {
+          throw new RuntimeException(s"Failed to create directory $dataFolder.")
         }
-      }.recover {
-        case e: Exception => {
+      } else if (!dataFolderFile.isDirectory) {
+        throw new RuntimeException(s"$dataFolder exists but is not a directory.")
+      }
+
+      file.ref.copyTo(filePath)
+
+      // Prepare the file as a FilePart
+      val filePart = FilePart(
+        key = "file",
+        filename = filePath.getName,
+        contentType = Some(Files.probeContentType(filePath.toPath)),
+        ref = FileIO.fromPath(filePath.toPath)
+      )
+
+      // Send the file as multipart/form-data
+      ws.url(s"${config.get[String]("server_url")}/add_document")
+        .withRequestTimeout(5.minutes)
+        .post(Source(List(filePart, DataPart("dataset", dataset))))
+        .map { response =>
+          // Remove the file locally
           filePath.delete()
-          Redirect(routes.HomeController.add()).flashing("error" -> s"Internal server error: ${e.getMessage()}")
+          response.status == 200
+        }.recover {
+          case e: Exception => {
+            filePath.delete()
+            false
+          }
         }
-      }
-    }.getOrElse {
-      Future.successful(Redirect(routes.HomeController.add()).flashing(
-        "error" -> "No file found to upload."
-      ))
+      })
+    fileUploads.map {results =>
+      if (results.forall(x => x))
+        Redirect(routes.HomeController.add()).flashing("success" -> s"All ${results.size} files were successfully added to the database.")
+      else
+        Redirect(routes.HomeController.add()).flashing("error" -> s"Note all files were successfully added. ${results.filter(x => x).size} succeeded, ${results.filter(x => !x).size} failed.")
     }
   }
 

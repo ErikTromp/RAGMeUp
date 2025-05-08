@@ -32,7 +32,7 @@
                 <label for="formFile" class="form-label">Upload a new document</label>
                 <input type="text" name="dataset" class="mb-2 form-control" placeholder="dataset name" required />
                 <input type="hidden" name="csrfToken" value="@helper.CSRF.getToken.value" />
-                <input class="form-control fileupload" type="file" id="formFile" name="file">
+                <input class="form-control fileupload" type="file" id="formFile" name="file[]" multiple="multiple">
             </div>
             <button type="submit" class="btn btn-primary">Upload</button>
         </form>

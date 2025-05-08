@@ -6,6 +6,8 @@ import json
 import jq
 from pptx import Presentation
 
+import tiktoken
+
 from LLMHelper import LLMHelper
 
 from sentence_transformers import SentenceTransformer
@@ -57,6 +59,10 @@ class RAGHelper:
         # Provenance
         if os.getenv("provenance_method") == "similarity":
             self.similarity_attribution = DocumentSimilarityAttribution()
+        
+        # Summarization
+        if os.getenv("use_summarization") == "True":
+            self.tiktoken_encoder = tiktoken.encoding_for_model(os.getenv("summarization_encoder"))
 
     ############################
     ### Initialization functions
@@ -173,6 +179,58 @@ class RAGHelper:
         self.logger.info(f"Writing {len(documents)} documents to the vector store.")
         documents = self._deduplicate_chunks(documents)
         self.retriever.add_documents(documents)
+    
+    def add_document(self, file_path, dataset):
+        file_type = file_path.split(".")[-1]
+
+        if file_type == "json":
+            jq_compiled = jq.compile(os.getenv("json_schema"))
+
+        # Load the document based on the file type
+        documents = []
+        file_types = os.getenv("file_types").split(",")
+        if os.path.isfile(file_path) and file_type in file_types:
+            # Load the document based on the file type
+            if file_type == "json":
+                with open(file_path, "r", encoding="utf-8") as f:
+                    doc = json.load(f)
+                    doc = jq_compiled.input(doc).first()
+                    doc = json.dumps(doc)
+            elif file_type == "txt" or file_type == "xml":
+                with open(file_path, "r", encoding="utf-8") as f:
+                    doc = f.read()
+            elif file_type == "pptx":
+                presentation = Presentation(file_path)
+                full_text = []
+                for slide in presentation.slides:
+                    slide_text = []
+                    for shape in slide.shapes:
+                        if shape.has_text_frame:
+                            for paragraph in shape.text_frame.paragraphs:
+                                slide_text.append(paragraph.text)
+                    full_text.append("\n".join(slide_text))
+                doc = "\n\n".join(full_text)
+            else:
+                doc = self.converter.convert(file_path).document.export_to_text()
+            
+            # Chunk the document
+            chunks = self.splitter.split_text(doc)
+            chunks = [{
+                "id": hashlib.md5(chunk.encode()).hexdigest(),
+                "embedding": self.embeddings.encode(chunk),
+                "content": chunk,
+                "metadata": json.dumps({
+                    "source": file_path,
+                    "dataset": dataset
+                })
+            } for chunk in chunks]
+
+            # Insert the chunks into the vector store
+            documents.extend(chunks)
+        
+        self.logger.info(f"Wrote document {file_path} to the vector store.")
+        documents = self._deduplicate_chunks(documents)
+        self.retriever.add_documents(documents)
 
     def _deduplicate_chunks(self, documents):
         return list({doc['id']: doc for doc in documents}.values())
@@ -234,6 +292,21 @@ class RAGHelper:
         # Check if we need to fetch new documents
         fetch_new_documents = True
         if len(history) > 0:
+            # Summarize the history if needed
+            if os.getenv("use_summarization") == "True":
+                # Convert the history to a string
+                self.logger.info("Checking if we need to summarize the history.")
+                history_string = "\n\n".join([f"{message['role']}: {message['content']}" for message in history])
+                history_size = len(self.tiktoken_encoder.encode(history_string))
+                if history_size > int(os.getenv("summarization_threshold")):
+                    self.logger.info(f"Summarizing the history because it contains {history_size} tokens.")
+                    (response, _) = self.llm.generate_response(
+                        None,
+                        os.getenv("summarization_query").format(history=history_string),
+                        []
+                    )
+                    history = history[:1] + [{"role": "assistant", "content": response}]
+            
             # Get the LLM response to see if we need to fetch new documents
             self.logger.info("History is not empty, checking if we need to fetch new documents.")
             (response, _) = self.llm.generate_response(
@@ -247,12 +320,21 @@ class RAGHelper:
         # Fetch new documents if needed
         documents = None
         if fetch_new_documents:
+            # Apply hyde if needed
+            if os.getenv("use_hyde") == "True":
+                (response, _) = self.llm.generate_response(
+                    None,
+                    os.getenv("hyde_query").format(question=prompt),
+                    []
+                )
+                prompt = response
+
             self.logger.info("Fetching new documents.")
             prompt_embedding = self.embeddings.encode(prompt)
             documents = self.handle_documents(prompt, prompt_embedding)
 
             # Check if the answer is in the documents or not
-            if os.getenv("use_rewrite_loop") == "True":
+            if os.getenv("use_rewrite_loop") == "True" and not os.getenv("use_hyde") == "True":
                 self.logger.info("Rewrite is enabled - checking if the fetched documents contain the answer.")
                 (response, _) = self.llm.generate_response(
                     os.getenv("rewrite_query_instruction").format(context=self.format_documents(documents)),
@@ -276,8 +358,8 @@ class RAGHelper:
             else:
                 self.logger.info("Rewrite is disabled - using the original query.")
         
-        # Apply RE2 if turend on
-        if os.getenv("use_re2") == "True":
+        # Apply RE2 if turend on (but not in conjunction with hyde)
+        if os.getenv("use_re2") == "True" and not os.getenv("use_hyde") == "True":
             prompt = f"{prompt}\n{os.getenv('re2_prompt')}\n{prompt}"
         
         provenance_scores = None

@@ -42,7 +42,7 @@ def create_title():
 
     (response, _) = raghelper.llm.generate_response(
         None,
-        f"Write a succinct title (few words) for a chat that has the question: {question}\n\nYou NEVER give explanations, only the title and you are forced to always include exactly one emoji. You also stick to the language of the question.",
+        f"Write a succinct title (few words) for a chat that has the question: {question}\n\nYou NEVER give explanations, only the title and you are forced to always start and end with an emoji (two distinct ones!). You also stick to the language of the question.",
         []
     )
     logger.info(f"Title for question {question}: {response}")
@@ -136,10 +136,37 @@ def delete_document():
     if not os.path.exists(file_path):
         return jsonify({"error": "File not found"}), 404
 
+    # Remove the file from the filesystem
+    os.remove(file_path)
+
     delete_count = raghelper.retriever.delete([file_path])
 
     return jsonify({"count": delete_count})
 
+@app.route("/add_document", methods=['POST'])
+def add_document():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+
+    dataset = request.form.get('dataset')
+    if not dataset:
+        return jsonify({"error": "No dataset in the request"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    # Save the file to the data directory
+    file_path = os.path.join(os.getenv('data_directory'), dataset, file.filename)
+    # Create the dataset directory if it doesn't exist
+    dataset_dir = os.path.join(os.getenv('data_directory'), dataset)
+    if not os.path.exists(dataset_dir):
+        os.makedirs(dataset_dir)
+    file.save(file_path)
+
+    # Add the file to the databases
+    raghelper.add_document(file_path, dataset)
+    return jsonify({"file": file_path, "dataset": dataset})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0")

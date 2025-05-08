@@ -31,6 +31,7 @@ class ChatDAO @Inject()(@NamedDatabase("ragmeup") protected val dbConfigProvider
   }
   def addChatMessage(message: ChatMessage): Future[Int] = db.run(ChatMessages += message)
   def delete(id: String): Future[Int] = db.run(Chats.filter(_.id === id).delete)
+  def deleteMessages(chatId: String): Future[Int] = db.run(ChatMessages.filter(_.chatId === chatId).delete)
   def getHistory(chatId: String): Future[Seq[ChatMessage]] = db.run(
     Chats
       .join(ChatMessages)
