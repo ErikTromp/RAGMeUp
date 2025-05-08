@@ -40,7 +40,7 @@ class HomeController @Inject()(
       .withRequestTimeout(5 minutes)
       .get()
       .map(files => {
-        Ok(views.html.add(files.json.as[Seq[String]]))
+        Ok(views.html.add(files.json.as[Seq[JsObject]]))
       })
   }
 

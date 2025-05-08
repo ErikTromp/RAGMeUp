@@ -42,7 +42,7 @@ def create_title():
 
     (response, _) = raghelper.llm.generate_response(
         None,
-        f"Write a succinct title (few words) for a chat that has the question. {question}\n\nYou NEVER give explanations, only the title. You also stick to the language of the question.",
+        f"Write a succinct title (few words) for a chat that has the question: {question}\n\nYou NEVER give explanations, only the title and you are forced to always include exactly one emoji. You also stick to the language of the question.",
         []
     )
     logger.info(f"Title for question {question}: {response}")
@@ -86,22 +86,8 @@ def chat():
 
 @app.route("/get_documents", methods=['GET'])
 def get_documents():
-    """
-    Retrieve a list of documents from the data directory.
-
-    This endpoint checks the configured data directory and returns a list of files
-    that match the specified file types.
-
-    Returns:
-        JSON response containing the list of files.
-    """
-    data_dir = os.getenv('data_directory')
-    file_types = os.getenv("file_types", "").split(",")
-
-    # Filter files based on specified types
-    files = [f for f in os.listdir(data_dir)
-             if os.path.isfile(os.path.join(data_dir, f)) and os.path.splitext(f)[1][1:] in file_types]
-
+    # Query the database for all documents
+    files = raghelper.retriever.get_all_document_names()
     return jsonify(files)
 
 
@@ -150,9 +136,9 @@ def delete_document():
     if not os.path.exists(file_path):
         return jsonify({"error": "File not found"}), 404
 
-    # @TODO: Implement me
+    delete_count = raghelper.retriever.delete([file_path])
 
-    return jsonify({"count": result.delete_count})
+    return jsonify({"count": delete_count})
 
 
 if __name__ == "__main__":

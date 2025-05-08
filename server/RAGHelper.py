@@ -4,6 +4,7 @@ import glob
 from tqdm import tqdm
 import json
 import jq
+from pptx import Presentation
 
 from LLMHelper import LLMHelper
 
@@ -134,9 +135,25 @@ class RAGHelper:
                             doc = json.load(f)
                             doc = jq_compiled.input(doc).first()
                             doc = json.dumps(doc)
+                    elif file_type == "txt" or file_type == "xml":
+                        with open(file, "r", encoding="utf-8") as f:
+                            doc = f.read()
+                    elif file_type == "pptx":
+                        presentation = Presentation(file)
+                        full_text = []
+                        for slide in presentation.slides:
+                            slide_text = []
+                            for shape in slide.shapes:
+                                if shape.has_text_frame:
+                                    for paragraph in shape.text_frame.paragraphs:
+                                        slide_text.append(paragraph.text)
+                            full_text.append("\n".join(slide_text))
+                        doc = "\n\n".join(full_text)
                     else:
                         doc = self.converter.convert(file).document.export_to_text()
                     
+                    # Get the subfolder name of this document
+                    subfolder = os.path.basename(os.path.dirname(file)).replace(os.getenv("data_directory"), "")
                     # Chunk the document
                     chunks = self.splitter.split_text(doc)
                     chunks = [{
@@ -145,6 +162,7 @@ class RAGHelper:
                         "content": chunk,
                         "metadata": json.dumps({
                             "source": file,
+                            "dataset": subfolder
                         })
                     } for chunk in chunks]
 

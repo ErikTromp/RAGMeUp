@@ -4,7 +4,6 @@ from typing import List
 import regex
 import nltk
 import os
-import json
 
 class PostgresHybridRetriever():
     def __init__(self, connection_pool):
@@ -42,6 +41,8 @@ class PostgresHybridRetriever():
                         AND c.relkind = 'i'
                     ) THEN
                         CREATE INDEX ragmeup_sparse_embeddings_bm25 ON ragmeup_sparse_embeddings USING bm25 (id, content) WITH (key_field='id');
+                        CREATE INDEX idx_metadata_dense_dataset ON ragmeup_dense_embeddings (((metadata::jsonb ->> 'dataset')::text));
+                        CREATE INDEX idx_metadata_sparse_dataset ON ragmeup_sparse_embeddings (((metadata::jsonb->>'dataset')::text));
                     END IF;
                 END $$;
             """)
@@ -207,19 +208,41 @@ class PostgresHybridRetriever():
             if conn:
                 self.connection_pool.putconn(conn)
 
-    def delete(self, ids: List[str]) -> None:
+    def delete(self, filenames: List[str]) -> None:
         conn = None
         try:
             conn = self.connection_pool.getconn()
             with conn.cursor() as cursor:
-                placeholders = ','.join(['%s'] * len(ids))
-                cursor.execute(f"DELETE FROM ragmeup_sparse_embeddings WHERE id IN ({placeholders});", tuple(ids))
-                cursor.execute(f"DELETE FROM ragmeup_dense_embeddings WHERE id IN ({placeholders});", tuple(ids))
-                cursor.execute(f"VACUUM ragmeup_sparse_embeddings;")
-                cursor.execute(f"VACUUM ragmeup_dense_embeddings;")
+                placeholders = ','.join(['%s'] * len(filenames))
+                cursor.execute(f"DELETE FROM ragmeup_sparse_embeddings WHERE metadata->>'source' IN ({placeholders});", tuple(filenames))
                 conn.commit()
+                delete_count = cursor.rowcount
+                cursor.execute(f"DELETE FROM ragmeup_dense_embeddings WHERE metadata->>'source' IN ({placeholders});", tuple(filenames))
+                conn.commit()
+                
+                # Close the current transaction before running VACUUM
+                conn.close()
+                return delete_count
         except Exception as e:
             print(f"Error while deleting documents from Postgres: {e}")
+            if conn:
+                conn.rollback()
+        finally:
+            # Return the connection to the pool
+            if conn:
+                self.connection_pool.putconn(conn)
+    
+    def get_all_document_names(self):
+        conn = None
+        try:
+            conn = self.connection_pool.getconn()
+            with conn.cursor() as cursor:
+                cursor.execute("select distinct metadata->>'source', metadata->>'dataset' from ragmeup_sparse_embeddings;")
+                results = cursor.fetchall()
+                return [{"filename": row[0].replace(f'{os.getenv("data_directory")}/', ""), "dataset": row[1]} for row in results]
+                conn.commit()
+        except Exception as e:
+            print(f"Error while getting all document names from Postgres: {e}")
             if conn:
                 conn.rollback()
         finally:

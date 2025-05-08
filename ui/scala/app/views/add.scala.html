@@ -1,6 +1,7 @@
 @import views.html.helper._
 @import play.api.mvc.RequestHeader
-@(files: Seq[String])(implicit request: RequestHeader, flash: Flash)
+@import play.api.libs.json._
+@(files: Seq[JsObject])(implicit request: RequestHeader, flash: Flash)
 
 @main() {
 @flash.get("success") match {
@@ -29,6 +30,7 @@
         <form action="@controllers.routes.HomeController.upload()" method="post" enctype="multipart/form-data">
             <div class="mb-3">
                 <label for="formFile" class="form-label">Upload a new document</label>
+                <input type="text" name="dataset" class="mb-2 form-control" placeholder="dataset name" required />
                 <input type="hidden" name="csrfToken" value="@helper.CSRF.getToken.value" />
                 <input class="form-control fileupload" type="file" id="formFile" name="file">
             </div>
@@ -43,12 +45,13 @@
             The following documents are currently in the database. Click on one to download.
         </p>
         <table class="table" style="margin: 20px;">
-            @for(fileGroup <- files.grouped(6)){
+            @for(fileGroup <- files.sortBy(file => (file \ "dataset").as[String] + (file \ "filename").as[String]).grouped(6)){
             <tr>
                 @for(file <- fileGroup){
                     <td>
-                        <a href="@controllers.routes.HomeController.delete(file)" style="text-decoration: none; color: #ff6e6e; padding-right: 10px;"><i class="fa-solid fa-trash" style="color: #d40005;"></i></a>
-                        <a href="@controllers.routes.HomeController.download(file)" style="text-decoration: none; color: #364196;">@file</a>
+                        <a href="@controllers.routes.HomeController.delete((file \ "filename").as[String])" style="text-decoration: none; color: #ff6e6e; padding-right: 10px;"><i class="fa-solid fa-trash" style="color: #d40005;"></i></a>
+                        <a href="@controllers.routes.HomeController.download((file \ "filename").as[String])" style="text-decoration: none; color: #364196;">@{(file \ "filename").as[String]}</a>
+                        (dataset: @{if ((file \ "dataset").as[String].size > 0 ) (file \ "dataset").as[String] else {<i>NONE</i>}})
                     </td>
                 }
             </tr>

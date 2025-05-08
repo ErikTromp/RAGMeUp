@@ -5,6 +5,9 @@ class Reranker:
         self.reranker = Ranker(os.getenv("rerank_model"), cache_dir="flashrank")
 
     def rerank_documents(self, documents, prompt):
+        if len(documents) == 0:
+            return []
+        
         # Create passages in the format expected by Flashrank
         passages = [
             {
