@@ -1,11 +1,28 @@
-@(chats: Seq[models.Chat])
+@(datasets: Seq[String], chats: Seq[models.Chat])
 <nav id="right-sidebar" class="bg-light sidebar sidebar-right" style="height: 100%; padding: 5px;">
-    <div class="text-end mb-2" style="padding-right: 10px;">
-        <a href="@controllers.routes.HomeController.index()" class="text-dark" style="font-size: 1.2rem;">
-            <i class="fa-solid fa-pen-to-square"></i>
-        </a>
+    <h5>Select datasets to chat on</h5>
+    <div id="type-selector" class="d-flex flex-wrap">
+        @for(dataset <- datasets) {
+            <div class="dataset-item" data-type="@dataset">@{if (dataset == "") "_blank_" else dataset}</div>
+        }
     </div>
-    Previous chats
+
+    <div>
+        <strong>Selected Datasets:</strong>
+        <div id="selectedDatasets" class="mt-2">
+        </div>
+    </div>
+
+    <div class="row mb-2 mt-4">
+        <div class="col-10">
+            <h5>Previous chats</h5>
+        </div>
+        <div class="col-2">
+            <a href="@controllers.routes.HomeController.index()" class="text-dark" style="font-size: 1.2rem;">
+                <i class="fa-solid fa-plus"></i>
+            </a>
+        </div>
+    </div>
     <ul class="nav flex-column">
         @for(chat <- chats) {
         <li class="nav-item mb-2">
@@ -22,7 +39,22 @@
     </ul>
 </nav>
 <script type="text/javascript">
+    var selectedDatasets = [];
     $(document).ready(function() {
+         $('.dataset-item').on('click', function() {
+            const type = $(this).data('type');
+            $(this).toggleClass('selected');
+
+            if ($(this).hasClass('selected')) {
+                if (!selectedDatasets.includes(type)) {
+                    selectedDatasets.push(type);
+                }
+            } else {
+                selectedDatasets = selectedDatasets.filter(t => t !== type);
+            }
+        });
+
+
         $(".delconvo").on('click', function (event) {
             event.preventDefault();
             var chatId = $(this).data('id');

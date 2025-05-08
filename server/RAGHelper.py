@@ -259,9 +259,9 @@ class RAGHelper:
             )
         return "\n\n".join(doc_strings)
 
-    def handle_documents(self, prompt, prompt_embedding):
+    def handle_documents(self, prompt, prompt_embedding, datasets):
         # Reobtain documents with new question
-        documents = self.retriever.get_relevant_documents(prompt, prompt_embedding)
+        documents = self.retriever.get_relevant_documents(prompt, prompt_embedding, datasets)
 
         # Check if we need to apply the reranker and run it
         if os.getenv("rerank") == "True":
@@ -284,7 +284,7 @@ class RAGHelper:
 
         return provenance_scores
 
-    def handle_user_interaction(self, prompt, history):
+    def handle_user_interaction(self, prompt, history, datasets):
         """
         Handle user interaction with the RAG system.
         """
@@ -331,7 +331,7 @@ class RAGHelper:
 
             self.logger.info("Fetching new documents.")
             prompt_embedding = self.embeddings.encode(prompt)
-            documents = self.handle_documents(prompt, prompt_embedding)
+            documents = self.handle_documents(prompt, prompt_embedding, datasets)
 
             # Check if the answer is in the documents or not
             if os.getenv("use_rewrite_loop") == "True" and not os.getenv("use_hyde") == "True":
@@ -352,7 +352,7 @@ class RAGHelper:
                     self.logger.info(f"Rewrite complete, original query: {prompt}, rewritten query: {new_prompt}")
                     rewritten = new_prompt
                     # Reobtain documents with new question
-                    documents = self.handle_documents(new_prompt, prompt_embedding)
+                    documents = self.handle_documents(new_prompt, prompt_embedding, datasets)
                 else:
                     self.logger.info("Rewrite is enabled but the query is adequate.")
             else:

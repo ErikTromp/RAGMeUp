@@ -3,7 +3,7 @@
 @import play.api.libs.json._
 @(files: Seq[JsObject])(implicit request: RequestHeader, flash: Flash)
 
-@main() {
+@main(Nil) {
 @flash.get("success") match {
     case Some(message) => {
         <div class="row" style="padding-top: 20px;">

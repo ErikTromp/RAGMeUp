@@ -218,3 +218,20 @@ $speed: 1.5s;
 .documentshown {
     background-color: #dee2e6 !important;
 }
+
+.dataset-item {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #f8f9fa;
+    border-radius: 20px;
+    margin: 1px 5px 1px 5px;
+    padding: 2px 10px 2px 10px;
+    border: 1px solid #555;
+}
+.dataset-item:hover {
+    background-color: #e9ecef;
+}
+.dataset-item.selected {
+    background-color: #B4CFEC;
+    font-weight: bold;
+}

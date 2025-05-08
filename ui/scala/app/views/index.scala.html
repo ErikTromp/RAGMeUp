@@ -1,9 +1,8 @@
 @import views.html.helper._
 @import play.api.mvc.RequestHeader
-@(config: play.api.Configuration, chatLogs: Seq[models.Chat], chatHistory: Option[(models.Chat, Seq[models.ChatMessage])] = None)(implicit request: RequestHeader)
+@(config: play.api.Configuration, datasets: Seq[String], chatLogs: Seq[models.Chat], chatHistory: Option[(models.Chat, Seq[models.ChatMessage])] = None)(implicit request: RequestHeader)
 
-@main(chatLogs) {
-
+@main(datasets, chatLogs) {
 <div id="mainContainer" class="container">
   <div class="card" id="queryCard">
     <div class="card-body" style="text-align: center; width: 800px;">
@@ -280,7 +279,8 @@
               message_offset: messageOffset,
               query: query,
               history: chathistory,
-              docs: documents
+              docs: documents,
+              datasets: selectedDatasets
             }),
             contentType: "application/json; charset=utf-8",
             dataType: "json",

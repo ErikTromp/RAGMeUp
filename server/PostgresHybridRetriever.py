@@ -115,7 +115,7 @@ class PostgresHybridRetriever():
         sanitized_query = ' '.join(tokens)
         return sanitized_query
 
-    def get_relevant_documents(self, query, query_embedding):
+    def get_relevant_documents(self, query, query_embedding, datasets):
         conn = None
         try:
             conn = self.connection_pool.getconn()
@@ -126,6 +126,13 @@ class PostgresHybridRetriever():
                     index = query.find(f"\n{os.getenv('re2_prompt')}")
                     query = query[:index]
                 
+                # Build the dataset filter
+                if len(datasets) > 0:
+                    dataset_string = [f"'{dataset}'" for dataset in datasets]
+                    dataset_filter = f"metadata->>'dataset' IN ({', '.join(dataset_string)})"
+                else:
+                    dataset_filter = "TRUE"
+
                 # Get both the dense and sparse results, unified
                 search_command = f"""
                     WITH combined AS (
@@ -138,7 +145,7 @@ class PostgresHybridRetriever():
                                 NULL::float AS distance,
                                 'bm25' AS source
                             FROM ragmeup_sparse_embeddings
-                            WHERE content @@@ %s
+                            WHERE content @@@ %s AND {dataset_filter}
                             ORDER BY score_bm25 DESC
                             LIMIT %s
                         ) bm25_results
@@ -154,6 +161,7 @@ class PostgresHybridRetriever():
                                 embedding <=> %s::vector AS distance,
                                 'vector' AS source
                             FROM ragmeup_dense_embeddings
+                            WHERE {dataset_filter}
                             ORDER BY distance
                             LIMIT %s
                         ) vector_results
@@ -243,6 +251,23 @@ class PostgresHybridRetriever():
                 conn.commit()
         except Exception as e:
             print(f"Error while getting all document names from Postgres: {e}")
+            if conn:
+                conn.rollback()
+        finally:
+            # Return the connection to the pool
+            if conn:
+                self.connection_pool.putconn(conn)
+    
+    def get_datasets(self):
+        conn = None
+        try:
+            conn = self.connection_pool.getconn()
+            with conn.cursor() as cursor:
+                cursor.execute("select distinct metadata->>'dataset' from ragmeup_sparse_embeddings;")
+                results = cursor.fetchall()
+                return [row[0] for row in results]
+        except Exception as e:
+            print(f"Error while getting datasets from Postgres: {e}")
             if conn:
                 conn.rollback()
         finally:

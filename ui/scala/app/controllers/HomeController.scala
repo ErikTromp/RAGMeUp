@@ -28,10 +28,20 @@ class HomeController @Inject()(
     feedbackDAO: FeedbackDAO
 ) (implicit ec: ExecutionContext) extends AbstractController(cc) {
 
+  def getDatasets() = {
+    ws
+      .url(s"${config.get[String]("server_url")}/get_datasets")
+      .withRequestTimeout(5 minutes)
+      .get()
+      .map(datasets => datasets.json.as[Seq[String]])
+  }
+
   def index() = Action.async { implicit request: Request[AnyContent] =>
-    chatDAO.getLastN(20).map { chats =>
-      Ok(views.html.index(config, chats, None))
-    }
+    for {
+      chats <- chatDAO.getLastN(20)
+      datasets <- getDatasets()
+    } yield
+      Ok(views.html.index(config, datasets, chats, None))
   }
 
   def add() = Action.async { implicit request: Request[AnyContent] =>
@@ -51,6 +61,7 @@ class HomeController @Inject()(
     val docs = (json \ "docs").as[Seq[JsObject]]
     val chatId = (json \ "id").as[String]
     val messageOffset = (json \ "message_offset").as[Int]
+    val datasets = (json \ "datasets").asOpt[Seq[String]].getOrElse(Nil)
     val askTime = System.currentTimeMillis()
 
     ws
@@ -59,7 +70,8 @@ class HomeController @Inject()(
       .post(Json.obj(
         "prompt" -> query,
         "history" -> history,
-        "docs" -> docs
+        "docs" -> docs,
+        "datasets" -> datasets
       ))
       .flatMap(response =>
         // Check if the chat exists
@@ -88,7 +100,7 @@ class HomeController @Inject()(
             Future.successful().map { _ =>
               (response.json \ "history").as[Seq[JsObject]].drop(messageOffset - 1)
             }
-          
+
           newHistoryFuture.flatMap { newHistory =>
             // Now insert the chat messages
             val (systemMessages, historyMessages) = newHistory.partition(message => (message \ "role").as[String] == "system")
@@ -220,7 +232,8 @@ class HomeController @Inject()(
       chat <- chatDAO.get(chatId)
       messages <- chatDAO.getHistory(chatId)
       chats <- chatDAO.getLastN(20)
-    } yield Ok(views.html.index(config, chats, Some((chat.get, messages))))
+      datasets <- getDatasets()
+    } yield Ok(views.html.index(config, datasets, chats, Some((chat.get, messages))))
   }
 
   def deleteChat() = Action.async { implicit request: Request[AnyContent] =>

@@ -64,10 +64,11 @@ def chat():
     prompt = json_data.get('prompt')
     history = json_data.get('history', [])
     original_docs = json_data.get('docs', [])
+    datasets = json_data.get('datasets', [])
     docs = original_docs
 
     # Get the LLM response
-    (response, documents, fetched_new_documents, rewritten, new_history, provenance_scores) = raghelper.handle_user_interaction(prompt, history)
+    (response, documents, fetched_new_documents, rewritten, new_history, provenance_scores) = raghelper.handle_user_interaction(prompt, history, datasets)
     if not fetched_new_documents:
         documents = docs
 
@@ -167,6 +168,11 @@ def add_document():
     # Add the file to the databases
     raghelper.add_document(file_path, dataset)
     return jsonify({"file": file_path, "dataset": dataset})
+
+@app.route("/get_datasets", methods=['GET'])
+def get_datasets():
+    datasets = raghelper.retriever.get_datasets()
+    return jsonify(datasets)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0")
