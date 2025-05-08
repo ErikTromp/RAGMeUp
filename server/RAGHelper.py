@@ -196,6 +196,18 @@ class RAGHelper:
         
         return documents
 
+    def compute_provenance_scores(self, prompt, documents, response):
+        # Compute the provenance score
+        if os.getenv("provenance_method") in ["rerank", "llm", "similarity"]:
+            if os.getenv("provenance_method") == "rerank":
+                provenance_scores = compute_rerank_provenance(self.reranker, prompt, documents, response)
+            elif os.getenv("provenance_method") == "llm":
+                provenance_scores = compute_llm_provenance(self.llm, prompt, documents, response)
+            elif os.getenv("provenance_method") == "similarity":
+                provenance_scores = self.similarity_attribution.compute_similarity(prompt, documents, response)
+
+        return provenance_scores
+
     def handle_user_interaction(self, prompt, history):
         """
         Handle user interaction with the RAG system.
@@ -249,6 +261,8 @@ class RAGHelper:
         # Apply RE2 if turend on
         if os.getenv("use_re2") == "True":
             prompt = f"{prompt}\n{os.getenv('re2_prompt')}\n{prompt}"
+        
+        provenance_scores = None
 
         # Get the LLM response
         if len(history) == 0:
@@ -257,6 +271,7 @@ class RAGHelper:
                 os.getenv("rag_question_initial").format(question=prompt),
                 []
             )
+            provenance_scores = self.compute_provenance_scores(prompt, documents, response)
         elif fetch_new_documents:
             # Add the documents to the system prompt and remove the previous system prompt
             (response, new_history) = self.llm.generate_response(
@@ -264,6 +279,7 @@ class RAGHelper:
                 os.getenv("rag_question_followup").format(question=prompt),
                 [message for message in history if message["role"] != "system"]
             )
+            provenance_scores = self.compute_provenance_scores(prompt, documents, response)
         else:
             # Keep the full history, with system prompt and previous documents
             (response, new_history) = self.llm.generate_response(
@@ -271,16 +287,6 @@ class RAGHelper:
                 os.getenv("rag_question_followup").format(question=prompt),
                 history
             )
-        
-        # Compute the provenance score
-        provenance_scores = None
-        if os.getenv("provenance_method") in ["rerank", "llm", "similarity"]:
-            if os.getenv("provenance_method") == "rerank":
-                provenance_scores = compute_rerank_provenance(self.reranker, prompt, documents, response)
-            elif os.getenv("provenance_method") == "llm":
-                provenance_scores = compute_llm_provenance(self.llm, prompt, documents, response)
-            elif os.getenv("provenance_method") == "similarity":
-                provenance_scores = self.similarity_attribution.compute_similarity(prompt, documents, response)
         
         # Add the response to the history
         new_history.append({"role": "assistant", "content": response})

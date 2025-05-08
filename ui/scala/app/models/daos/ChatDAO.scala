@@ -37,6 +37,7 @@ class ChatDAO @Inject()(@NamedDatabase("ragmeup") protected val dbConfigProvider
       .on(_.id === _.chatId)
       .filter(chatWithMessage => chatWithMessage._1.id ===chatId)
       .map(_._2)
+      .sortBy(_.messageOffset)
       .result
   )
 

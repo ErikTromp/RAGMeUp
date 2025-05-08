@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     text TEXT,
     role TEXT,
     documents TEXT,
-    rewritten BOOLEAN,
+    rewritten TEXT,
     fetched_new_documents BOOLEAN,
     PRIMARY KEY (chat_id, message_offset),
     FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE

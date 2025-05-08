@@ -8,7 +8,8 @@ import slick.jdbc.{JdbcProfile, PostgresProfile, SQLiteProfile}
 import javax.inject.{Inject, Singleton}
 
 case class Chat(id: String, title: String, createdAt: Long)
-case class ChatMessage(chatId: String, messageOffset: Int, createdAt: Long, text: String, role: String, documents: String, rewritten: Boolean, fetchedNewDocuments: Boolean)
+case class ChatMessage(chatId: String, messageOffset: Int, createdAt: Long, text: String, role: String,
+                       documents: String, rewritten: Option[String], fetchedNewDocuments: Boolean)
 case class Feedback(
  chatId: String, messageOffset: Int, feedback: Boolean, feedbackText: String
 )
@@ -42,7 +43,7 @@ class SQLTables @Inject() (@NamedDatabase("ragmeup") protected val dbConfigProvi
     def text = column[String]("text")
     def role = column[String]("role")
     def documents = column[String]("documents")
-    def rewritten = column[Boolean]("rewritten")
+    def rewritten = column[Option[String]]("rewritten")
     def fetchedNewDocuments = column[Boolean]("fetched_new_documents")
     def * = (chatId, messageOffset, createdAt, text, role, documents, rewritten, fetchedNewDocuments) <> (ChatMessage.tupled, ChatMessage.unapply)
     def chat = foreignKey("chat_fk", chatId, TableQuery[ChatTable])(_.id)

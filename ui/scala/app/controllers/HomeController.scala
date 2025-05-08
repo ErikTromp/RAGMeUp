@@ -82,15 +82,20 @@ class HomeController @Inject()(
           }
         }).flatMap { chat =>
           // Now insert the chat messages
-          for {
-            _ <- chatDAO.addChatMessage(
-              ChatMessage(chat.id, messageOffset, askTime, query, "user", Json.stringify(Json.arr()), false, false)
-            )
-            _ <- chatDAO.addChatMessage(
-              ChatMessage(chat.id, messageOffset + 1, System.currentTimeMillis(), (response.json.as[JsObject] \ "reply").as[String], "assistant",
-                Json.stringify((response.json.as[JsObject] \ "documents").as[JsValue]), (response.json.as[JsObject] \ "rewritten").asOpt[String].isDefined, (response.json.as[JsObject] \ "fetched_new_documents").as[Boolean])
-            )
-          } yield {
+          val history = (response.json \ "history").as[Seq[JsObject]].drop(messageOffset - 1)
+          val (systemMessages, historyMessages) = history.partition(message => (message \ "role").as[String] == "system")
+
+          val chatMessages = (systemMessages.headOption match {
+            case Some(message) => Seq(ChatMessage(chat.id, messageOffset, askTime - 1, (message \ "content").as[String], "system", Json.stringify(Json.arr()), None, false))
+            case None => Nil
+          }) ++ historyMessages.map {message =>
+            if ((message \ "role").as[String] == "user")
+              ChatMessage(chat.id, (if (systemMessages.size > 0) 1 else 0) + messageOffset, askTime, (message \ "content").as[String], "user", Json.stringify(Json.arr()), None, false)
+            else
+              ChatMessage(chat.id, (if (systemMessages.size > 0) 1 else 0) + messageOffset + 1, System.currentTimeMillis(), (message \ "content").as[String], "assistant",
+                Json.stringify((response.json.as[JsObject] \ "documents").as[JsValue]), (response.json.as[JsObject] \ "rewritten").asOpt[String], (response.json.as[JsObject] \ "fetched_new_documents").as[Boolean])
+          }
+          Future.sequence(chatMessages.map(message => chatDAO.addChatMessage(message))).map {_ =>
             Ok(response.json)
           }
         }
@@ -194,7 +199,6 @@ class HomeController @Inject()(
 
   def feedback() = Action.async { implicit request: Request[AnyContent] =>
     val json = request.body.asJson.get.as[JsObject]
-    println("inserting feedback")
     feedbackDAO.add(Feedback(
       (json \ "chat_id").as[String],
       (json \ "message_offset").as[Int],

@@ -2,7 +2,7 @@
 @import play.api.mvc.RequestHeader
 @(config: play.api.Configuration, chatLogs: Seq[models.Chat], chatHistory: Option[(models.Chat, Seq[models.ChatMessage])] = None)(implicit request: RequestHeader)
 
-@main() {
+@main(chatLogs) {
 
 <div id="mainContainer" class="container">
   <div class="card" id="queryCard">
@@ -25,7 +25,7 @@
     <div id="dialogue" style="display: none;"></div>
   </div>
 </div>
-<div class="offset-md-1 col-md-10 chatinput" id="chatinputcontainer">
+<div class="offset-md-2 col-md-6 chatinput" id="chatinputcontainer">
   <div id="inputbar" class="input-group" style="display: none">
     <input type="text" id="query" class="form-control" placeholder="" name="query">
     <button class="btn btn-primary" type="submit" id="submitBtn2">
@@ -165,7 +165,6 @@
         $(row).append(col);
         $(dialogue).append(row);
         dialogue.scrollTop(dialogue[0].scrollHeight);
-        messageOffset += 1;
     }
 
     function presentDocuments(documents) {
@@ -269,6 +268,7 @@
         $("#inputbar").hide();
 
         addMessage(query, true);
+        messageOffset += 1;
         $("#loader").show();
         $(dialogue).show();
 
@@ -295,8 +295,12 @@
 
                 documents = data['documents'];
                 addMessage(data['reply'], false, data);
+                messageOffset += 1;
                 if (documents.length > 0 && data['fetched_new_documents']) {
                   presentDocuments(documents);
+                }
+                if (chathistory.length == 0) {
+                  messageOffset += 1;
                 }
                 chathistory = data['history'];
 
@@ -306,8 +310,7 @@
             error: function(errMsg) {
                 $("#loader").hide();
                 $("#inputbar").show();
-                console.log(errMsg);
-                addMessage('Something went wrong, please try again... (Error: ' + errMsg + ' )', false);
+                addMessage('Something went wrong, please try again... (Error: ' + errMsg.responseText + ' )', false);
             },
             timeout: 300000
         });
@@ -332,5 +335,53 @@
         });
     });
 </script>
+
+  @chatHistory match {
+    case Some(chatMessages) => {
+      <script type="text/javascript">
+                sessionid = '@chatMessages._1.id';
+                $('button[type="submit"]', this).prop('disabled', true);
+                $("#mainContainer").remove();
+
+                @if(chatMessages._2.size > 0) {
+                  $(dialogue).show();
+                }
+                @for(message <- chatMessages._2) {
+                  @if(message.role == "user") {
+                    addMessage(`@message.text`, true);
+                  } else if (message.role == "assistant") {
+                    data = {
+                      "reply": `@message.text.replaceAll("`", "\\\\`")`,
+                      "documents": @Html(message.documents),
+                      "question": `@message.text.replaceAll("`", "\\\\`")`,
+                      "fetched_new_documents": @message.fetchedNewDocuments
+                    };
+
+                    @message.rewritten match {
+                      case Some(rw) => {
+                        data["rewritten"] = `@rw.replaceAll("`", "\\\\`")`,
+                      }
+                      case None => {}
+                    }
+
+                    addMessage(`@message.text.replaceAll("`", "\\\\`")`, false, data);
+
+                    documents = @Html(message.documents);
+                    if (documents.length > 0 && @message.fetchedNewDocuments) {
+                      presentDocuments(documents);
+                    }
+                  }
+                  messageOffset += 1;
+                }
+                $("#inputbar").show();
+                $("#opengen-checkbox").show();
+                $("#opengen-checkboxlabel").show();
+                chathistory = @Html(play.api.libs.json.Json.toJson(chatMessages._2.map{message =>
+                  Map("role" -> message.role, "content" -> message.text)
+                }).toString);
+              </script>
+    }
+    case None => {}
+    }
 
 }
