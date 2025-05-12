@@ -42,16 +42,17 @@ class LLMHelper:
         if os.getenv("use_azure") == "True":
             self.logger.info("Initializing Azure OpenAI conversation.")
             api_key = os.getenv("AZURE_OPENAI_API_KEY")
-            api_base = os.getenv("AZURE_OPENAI_API_BASE")
-            deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-            api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2023-05-15v1")
-            if not all([api_key, api_base, deployment_name]):
-                print("Error: AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_BASE, or AZURE_OPENAI_DEPLOYMENT_NAME not found in .env file.")
+            api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+            deployment_name = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME")
+            api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+            if not all([api_key, api_endpoint, deployment_name, api_version]):
+                print("Error: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, or AZURE_OPENAI_DEPLOYMENT_NAME not found in .env file.")
                 return None
             return openai.AzureOpenAI(
                 api_key=api_key,
                 api_version=api_version,
-                azure_endpoint=api_base
+                azure_endpoint=api_endpoint,
+                azure_deployment=deployment_name,
             )
         if os.getenv("use_anthropic") == "True":
             self.logger.info("Initializing Anthropic conversation.")
@@ -94,8 +95,11 @@ class LLMHelper:
 
         # Generate the response
         if os.getenv("use_openai") == "True" or os.getenv("use_azure") == "True":
+            model = os.getenv("openai_model_name")
+            if os.getenv("use_azure") == "True":
+                model = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME")
             response = self.client.chat.completions.create(
-                model=os.getenv("openai_model_name"),
+                model=model,
                 messages=thread,
                 temperature=self.temperature,
             )
