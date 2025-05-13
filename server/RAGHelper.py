@@ -274,6 +274,7 @@ class RAGHelper:
 
     def compute_provenance_scores(self, prompt, documents, response):
         # Compute the provenance score
+        provenance_scores = None
         if os.getenv("provenance_method") in ["rerank", "llm", "similarity"]:
             if os.getenv("provenance_method") == "rerank":
                 provenance_scores = compute_rerank_provenance(self.reranker, prompt, documents, response)
