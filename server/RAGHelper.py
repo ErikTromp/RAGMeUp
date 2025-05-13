@@ -17,6 +17,7 @@ from docling.document_converter import DocumentConverter
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
+from ParagraphChunker import ParagraphChunker
 
 from Reranker import Reranker
 
@@ -111,6 +112,11 @@ class RAGHelper:
                 breakpoint_threshold_type=os.getenv("semantic_chunker_breakpoint_threshold_type"),
                 breakpoint_threshold_amount=os.getenv("semantic_chunker_breakpoint_threshold_amount"),
                 number_of_chunks=os.getenv("semantic_chunker_number_of_chunks"),
+            )
+        elif splitter_type == "ParagraphChunker":
+            return ParagraphChunker(
+                max_chunk_size=int(os.getenv("paragraph_chunker_max_chunk_size")),
+                paragraph_separator=os.getenv("paragraph_chunker_paragraph_separator")
             )
     
     ########################
