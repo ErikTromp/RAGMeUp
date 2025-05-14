@@ -28,3 +28,4 @@ psycopg2-binary==2.9.9
 deepeval
 nltk==3.9.1
 langchain-experimental==0.3.4
+pandas
