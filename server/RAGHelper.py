@@ -169,10 +169,14 @@ class RAGHelper:
                     else:
                         doc = self.converter.convert(file).document.export_to_text()
                     
-                    # Get the subfolder name of this document
-                    subfolder = os.path.basename(os.path.dirname(file)).replace(os.getenv("data_directory"), "")
-                    # Chunk the document
-                    chunks = self.splitter.split_text(doc)
+                    if not(file_type == "csv"):
+                        # Get the subfolder name of this document
+                        subfolder = os.path.basename(os.path.dirname(file)).replace(os.getenv("data_directory"), "")
+                        # Chunk the document
+                        chunks = self.splitter.split_text(doc)
+                    else:
+                        chunks = doc
+                    
                     chunks = [{
                         "id": hashlib.md5(chunk.encode()).hexdigest(),
                         "embedding": self.embeddings.encode(chunk),
