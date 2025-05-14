@@ -150,6 +150,11 @@ class RAGHelper:
                     elif file_type == "txt" or file_type == "xml":
                         with open(file, "r", encoding="utf-8") as f:
                             doc = f.read()
+                    elif file_type == "csv":
+                        import pandas as pd
+                        df = pd.read_csv(file, encoding="utf-8", sep=os.getenv("csv_separator"))
+                        json_data = df.to_dict(orient='records')
+                        doc = json.dumps(json_data)
                     elif file_type == "pptx":
                         presentation = Presentation(file)
                         full_text = []
