@@ -37,6 +37,7 @@ sbt run
 
 ## 📘 Documentation
 Full setup instructions, architecture docs, API references, and guides available at:
+
 👉 https://ragmeup.futureclub.nl
 
 
