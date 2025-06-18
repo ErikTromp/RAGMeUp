@@ -43,7 +43,9 @@ Full setup instructions, architecture docs, API references, and guides available
 ## 🧠 Why RAGMeUp?
 
 ⚙️ Modular: Use your own chunkers, vectorstores, or retrievers
+
 🚀 Fast to prototype: Focus on your RAG logic, not boilerplate
+
 🧩 Flexible: Plug-and-play architecture
 
 ## 🤝 Contributing
