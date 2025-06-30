@@ -4,6 +4,7 @@ from typing import List
 import regex
 import nltk
 import os
+from tqdm import tqdm
 
 class PostgresHybridRetriever():
     def __init__(self, connection_pool):
@@ -52,45 +53,52 @@ class PostgresHybridRetriever():
 
     def add_documents(self, documents) -> List[str]:
         conn = None
-        try:
-            conn = self.connection_pool.getconn()
-            with conn.cursor() as cursor:
-                # Add to the BM25 index
-                records = [
-                    (doc['id'], doc['content'], doc['metadata'])
-                    for doc in documents
-                ]
-                psycopg2.extras.execute_batch(
-                    cursor,
-                    f"""
-                        INSERT INTO ragmeup_sparse_embeddings (id, content, metadata)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (id) DO NOTHING
-                    """,
-                    records
-                )
-                conn.commit()
-            
-                # Now the dense embeddings
-                records = [
-                    (doc['id'], doc['embedding'].tolist(), doc['content'], doc['metadata'])
-                    for doc in documents
-                ]
-                psycopg2.extras.execute_batch(
-                    cursor,
-                    f"""
-                        INSERT INTO ragmeup_dense_embeddings (id, embedding, content, metadata)
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (id) DO NOTHING
-                    """,
-                    records
-                )
-                conn.commit()
-        except Exception as e:
-            print(f"Error executing Postgres query while inserting documents: {e}")
-        finally:
-            if conn:
-                self.connection_pool.putconn(conn)
+
+        # Batch these documents into chunks of 1000, with TQDM
+        with tqdm(total=len(documents), desc="Adding documents to Postgres") as pbar:
+            for i in range(0, len(documents), 1000):
+                chunk = documents[i:i+1000]
+
+                try:
+                    conn = self.connection_pool.getconn()
+                    with conn.cursor() as cursor:
+                        # Add to the BM25 index
+                        records = [
+                            (doc['id'], doc['content'], doc['metadata'])
+                            for doc in chunk
+                        ]
+                        psycopg2.extras.execute_batch(
+                            cursor,
+                            f"""
+                                INSERT INTO ragmeup_sparse_embeddings (id, content, metadata)
+                                VALUES (%s, %s, %s)
+                                ON CONFLICT (id) DO NOTHING
+                            """,
+                            records
+                        )
+                        conn.commit()
+                    
+                        # Now the dense embeddings
+                        records = [
+                            (doc['id'], doc['embedding'].tolist(), doc['content'], doc['metadata'])
+                            for doc in chunk
+                        ]
+                        psycopg2.extras.execute_batch(
+                            cursor,
+                            f"""
+                                INSERT INTO ragmeup_dense_embeddings (id, embedding, content, metadata)
+                                VALUES (%s, %s, %s, %s)
+                                ON CONFLICT (id) DO NOTHING
+                            """,
+                            records
+                        )
+                        conn.commit()
+                    pbar.update(len(chunk))
+                except Exception as e:
+                    print(f"Error executing Postgres query while inserting documents: {e}")
+                finally:
+                    if conn:
+                        self.connection_pool.putconn(conn)
     
     def has_data(self):
         conn = None
