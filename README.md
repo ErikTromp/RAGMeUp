@@ -2,10 +2,10 @@
 
 > A simple and extensible framework to build RAG (Retrieval-Augmented Generation) applications fast.
 
-[![License](https://img.shields.io/github/license/FutureClubNL/RAGMeUp?style=flat-square)](https://github.com/FutureClubNL/RAGMeUp/blob/main/LICENSE)
-[![GitHub Repo stars](https://img.shields.io/github/stars/FutureClubNL/RAGMeUp?style=social)](https://github.com/FutureClubNL/RAGMeUp/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/FutureClubNL/RAGMeUp?style=flat-square)](https://github.com/FutureClubNL/RAGMeUp/issues)
-[![Docs](https://img.shields.io/badge/docs-Docusaurus-blueviolet?logo=readthedocs&style=flat-square)](https://ragmeup.futureclub.nl)
+[![License](https://img.shields.io/github/license/ErikTromp/RAGMeUp?style=flat-square)](https://github.com/ErikTromp/RAGMeUp/blob/main/LICENSE)
+[![GitHub Repo stars](https://img.shields.io/github/stars/ErikTromp/RAGMeUp?style=social)](https://github.com/ErikTromp/RAGMeUp/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/ErikTromp/RAGMeUp?style=flat-square)](https://github.com/ErikTromp/RAGMeUp/issues)
+[![Docs](https://img.shields.io/badge/docs-Docusaurus-blueviolet?logo=readthedocs&style=flat-square)](https://ragmeup.understandling.com)
 
 ---
 
@@ -14,7 +14,7 @@
 **Server**
 ```
 # Clone the repo
-git clone https://github.com/FutureClubNL/RAGMeUp.git
+git clone https://github.com/ErikTromp/RAGMeUp.git
 cd RAGMeUp/server
 
 # Set up a virtual environment (recommended)
@@ -38,7 +38,7 @@ sbt run
 ## 📘 Documentation
 Full setup instructions, architecture docs, API references, and guides available at:
 
-👉 https://ragmeup.futureclub.nl
+👉 https://ragmeup.understandling.com
 
 
 ## 🧠 Why RAGMeUp?
