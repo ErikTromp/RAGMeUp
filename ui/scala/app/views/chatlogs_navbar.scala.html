@@ -2,7 +2,7 @@
 <nav id="right-sidebar" class="bg-light sidebar sidebar-right" style="height: 100%; padding: 5px;">
     <h5>Select datasets to chat on</h5>
     <div id="type-selector" class="d-flex flex-wrap">
-        @for(dataset <- datasets) {
+        @for(dataset <- datasets.sorted) {
             <div class="dataset-item" data-type="@dataset">@{if (dataset == "") "_blank_" else dataset}</div>
         }
     </div>
