@@ -1,6 +1,7 @@
 import psycopg2
 import psycopg2.extras
-from typing import List
+from typing import List, Dict
+from collections import defaultdict
 import regex
 import nltk
 import os
@@ -124,6 +125,12 @@ class PostgresHybridRetriever():
         return sanitized_query
 
     def get_relevant_documents(self, query, query_embedding, datasets):
+        if os.getenv("use_rrf") == "True":
+            return self._get_relevant_documents_rrf(query, query_embedding, datasets)
+        return self._get_relevant_documents_minmax(query, query_embedding, datasets)
+
+    # ─── Min-max normalization ranking (original) ─────────────────────
+    def _get_relevant_documents_minmax(self, query, query_embedding, datasets):
         conn = None
         try:
             conn = self.connection_pool.getconn()
@@ -221,6 +228,125 @@ class PostgresHybridRetriever():
             print(f"Error while getting relevant documents from Postgres: {e}")
         finally:
             # Return the connection to the pool
+            if conn:
+                self.connection_pool.putconn(conn)
+
+    # ─── Reciprocal Rank Fusion (RRF) ranking ─────────────────────────
+    #
+    # RRF merges ranked lists by assigning each result a score of
+    # 1 / (k + rank), where k is a smoothing constant (default 60).
+    # Scores are summed across all lists (BM25 + vector).
+    #
+    # Advantages over min-max normalization:
+    #   • Rank-based: immune to score-magnitude bias where high BM25
+    #     scores on short documents dominate the final ranking.
+    #   • Stable: adding/removing a low-ranked result doesn't shift
+    #     the scores of higher-ranked results (no global min/max).
+    #   • Simple: no normalization windows or tuneable weights.
+    #
+    # Enable with use_rrf=True and optionally set rrf_k (default 60).
+    # ──────────────────────────────────────────────────────────────────
+    def _get_relevant_documents_rrf(self, query, query_embedding, datasets):
+        conn = None
+        try:
+            conn = self.connection_pool.getconn()
+            with conn.cursor() as cursor:
+                # Remove the re2 prompt if it exists
+                if os.getenv("use_re2") == "True":
+                    os.getenv("re2_prompt")
+                    index = query.find(f"\n{os.getenv('re2_prompt')}")
+                    query = query[:index]
+
+                # Build the dataset filter
+                if len(datasets) > 0:
+                    dataset_string = [f"'{dataset}'" for dataset in datasets]
+                    dataset_filter = f"metadata->>'dataset' IN ({', '.join(dataset_string)})"
+                else:
+                    dataset_filter = "TRUE"
+
+                k = int(os.getenv("vector_store_k"))
+                rrf_k = int(os.getenv("rrf_k", "60"))
+                # Fetch a wider window so RRF has enough candidates
+                fetch_k = max(k * 4, 20)
+
+                # ── BM25 results (ordered by BM25 score descending) ───
+                bm25_query = f"""
+                    SELECT id, content, metadata
+                    FROM ragmeup_sparse_embeddings
+                    WHERE content @@@ %s AND {dataset_filter}
+                    ORDER BY paradedb.score(id) DESC
+                    LIMIT %s;
+                """
+                cursor.execute(bm25_query, (
+                    self.escape_query(query),
+                    fetch_k,
+                ))
+                bm25_rows = cursor.fetchall()
+
+                # ── Vector results (ordered by cosine distance asc) ───
+                vector_query = f"""
+                    SELECT id, content, metadata,
+                           embedding <=> %s::vector AS distance
+                    FROM ragmeup_dense_embeddings
+                    WHERE {dataset_filter}
+                    ORDER BY distance
+                    LIMIT %s;
+                """
+                cursor.execute(vector_query, (
+                    query_embedding.tolist(),
+                    fetch_k,
+                ))
+                vector_rows = cursor.fetchall()
+
+            # ── Build per-document RRF scores in Python ───────────────
+            # Dict keyed by document id → accumulated data
+            doc_map: Dict[str, dict] = {}
+
+            # Process BM25 results
+            for rank, row in enumerate(bm25_rows):
+                doc_id, content, metadata = row
+                rrf_score = 1.0 / (rrf_k + rank + 1)
+                if doc_id not in doc_map:
+                    doc_map[doc_id] = {
+                        "content": content,
+                        "metadata": metadata,
+                        "rrf_score": 0.0,
+                        "sources": [],
+                    }
+                doc_map[doc_id]["rrf_score"] += rrf_score
+                doc_map[doc_id]["sources"].append("bm25")
+
+            # Process vector results
+            for rank, row in enumerate(vector_rows):
+                doc_id, content, metadata, distance = row
+                rrf_score = 1.0 / (rrf_k + rank + 1)
+                if doc_id not in doc_map:
+                    doc_map[doc_id] = {
+                        "content": content,
+                        "metadata": metadata,
+                        "rrf_score": 0.0,
+                        "sources": [],
+                    }
+                doc_map[doc_id]["rrf_score"] += rrf_score
+                doc_map[doc_id]["sources"].append("vector")
+
+            # Sort by combined RRF score descending, take top_k
+            ranked = sorted(doc_map.values(), key=lambda d: d["rrf_score"], reverse=True)[:k]
+
+            results = [{
+                "content": doc["content"],
+                "metadata": {
+                    **doc["metadata"],
+                    "distance": doc["rrf_score"],
+                    "sources": ",".join(doc["sources"]),
+                },
+            } for doc in ranked]
+
+            return results
+
+        except Exception as e:
+            print(f"Error while getting relevant documents (RRF) from Postgres: {e}")
+        finally:
             if conn:
                 self.connection_pool.putconn(conn)
 
